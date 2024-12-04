@@ -9,3 +9,4 @@
    1. 启动neo4j服务，测试localhost:7474能否连接
    2. 运行neodb/create_graph.py在neo4j中创建图数据库
    3. 运行python manage.py runserver启动程序，在localhost:8000中查看
+      ![Uploading image.png…]()
