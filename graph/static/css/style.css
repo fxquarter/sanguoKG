@@ -1,0 +1,53 @@
+#main {
+    width: 100%;
+    height: 50rem;
+    float: left;
+    transition: margin-right 0.5s ease;
+}
+.filter-container {
+    margin: 1.25rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+.filter-container select {
+    font-size: 1rem;
+    padding: 0.625rem;
+}
+#sidebar {
+    width: 19rem;
+    height: 100%;
+    background-color: #f4f4f4;
+    position: fixed;
+    right: -19rem;  /* Initially hide the sidebar off-screen */
+    top: 0;
+    padding: 1.25rem;
+    border-left: 1px solid #ddd;
+    transition: right 0.5s ease; /* Smooth sliding effect */
+    z-index: 11;
+}
+
+#sidebar img {
+    width: 100%;
+    height: auto;
+}
+
+#sidebar h2 {
+    margin-top: 1.25rem;
+}
+
+#sidebar p {
+    margin-top: 0.625rem;
+}
+
+/* Overlay background when sidebar is shown */
+#overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.3); /* Semi-transparent background */
+    display: none; /* Hidden by default */
+    z-index: 10;
+}
