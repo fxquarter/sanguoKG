@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>三国演义关系图</title>
+    <script src="../../static/js/echarts.min.js"></script>
+
+    <link rel="stylesheet" href="../../static/css/style.css">
+</head>
+<body>
+    <!-- 头部标题栏 -->
+    <div class="header">
+        <h1>三国演义知识图谱</h1>
+    </div>
+    <!-- 主内容区 -->
+    <div class="container">
+        <!-- 左侧页面栏 -->
+        <div class="sidebar">
+            <a href="#" class="active" onclick="showPage('graph')">知识图谱</a>
+        </div>
+        <!-- 右侧主展示部分 -->
+        <div class="main-content">
+            <!-- 知识图谱页面 -->
+            <div id="graph-page" style="display: block;">
+                <div class="search-container">
+                    <!-- 搜索功能 -->
+                    <input type="text" id="search-input" class="search-input" placeholder="输入人名搜索">
+                    <!-- 阵营筛选 -->
+
+                    <select id="camp-select">
+                        <option value="all">所有阵营</option>
+                        <option value="蜀">蜀</option>
+                        <option value="魏">魏</option>
+                        <option value="吴">吴</option>
+                        <option value="群雄">群雄</option>
+                        <option value="unknown">unknown</option>
+                    </select>
+                </div>
+                <div id="main"></div>
+                <!-- 人物详情侧边栏 -->
+                <div id="sidebar">
+                    <h2 id="person-name">人物名称</h2>
+                    <img id="person-image" src="" alt="人物图片" />
+                    <p id="person-intro">人物介绍</p>
+                </div>
+                <!-- 遮罩层用于关闭侧边栏 -->
+                <div id="overlay"></div>
+            </div>
+
+            <div id="color-legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #1772b4;"></div>
+                    <span>蜀国</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #7c1823;"></div>
+                    <span>魏国</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #ff9900;"></div>
+                    <span>吴国</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #3c9566;"></div>
+                    <span>群雄</span>
+                </div>
+                 <div class="legend-item">
+                    <div class="legend-color" style="background-color: #808080;"></div>
+                    <span>unknown</span>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+
+    <script>
+        var graphData = {{ graph_data | safe }};
+
+        // 初始化节点数据
+        var nodes = graphData.nodes.map(function(node) {
+            return {
+                id: node.name,
+                name: node.name,
+                symbolSize: 50, // 初始的节点大小
+                camp: node.camp,
+                itemStyle: {
+                    color: node.camp === '蜀' ? '#1772b4' :
+                    (node.camp === '魏' ? '#7c1823' :
+                        (node.camp === '吴' ? '#ff9900' :
+                            (node.camp === 'unknown' ? '#808080' : '#3c9566')))
+                },
+                label: {
+                    show: true, // 显示标签
+                    position: 'inside', // 标签位置在节点内部
+                    formatter: '{b}' // 显示节点名称
+                },
+                draggable: true, // 允许拖动节点
+                outDegree: 0, // 初始化出度
+                weight: 1 // 初始权重
+            };
+        });
+
+        // 初始化边数据
+        var links = graphData.edges.map(function(edge) {
+            return {
+                source: edge.source,
+                target: edge.target,
+                value: edge.relation,
+                label: {
+                    show: true, // 显示边的标签
+                    formatter: edge.relation, // 显示关系类型
+                    position: 'middle', // 标签位置在边的中间
+                    fontSize: 12 // 标签字体大小
+                },
+                lineStyle: {
+                    width: 2,
+                    color: 'source',
+                    curveness: 0.2 // 边的弯曲度
+                },
+                symbol: ['none', 'arrow'],
+                symbolSize: [10, 15], // 箭头的大小
+            };
+        });
+
+        // 计算节点的出度
+        nodes.forEach(function(node) {
+            node.outDegree = links.filter(function(link) {
+                return link.source === node.name;
+            }).length;
+        });
+
+        // 计算 PageRank
+        var dampingFactor = 0.85;
+        var iterations = 20; // PageRank 算法的迭代次数
+        var nodeCount = nodes.length;
+        var threshold = 0.0001; // 迭代的收敛阈值
+
+        // 初始化 PageRank 权重
+        nodes.forEach(function(node) {
+            node.weight = 1 / nodeCount; // 初始化 PageRank 权重
+        });
+
+        // 计算 PageRank
+        for (var i = 0; i < iterations; i++) {
+            var newWeights = nodes.map(function(node) {
+                var incomingLinks = links.filter(function(link) {
+                    return link.target === node.name;
+                });
+
+                var sum = 0;
+                incomingLinks.forEach(function(link) {
+                    var sourceNode = nodes.find(function(n) {
+                        return n.name === link.source;
+                    });
+                    sum += (sourceNode.weight / sourceNode.outDegree);
+                });
+
+                return (1 - dampingFactor) / nodeCount + dampingFactor * sum;
+            });
+
+            // 更新 PageRank 权重
+            nodes.forEach(function(node, index) {
+                node.weight = newWeights[index];
+            });
+        }
+
+        // 根据 PageRank 权重调整节点大小
+        var maxWeight = Math.max(...nodes.map(function(node) {
+            return node.weight;
+        }));
+
+        nodes.forEach(function(node) {
+            node.symbolSize = 50 + 100 * (node.weight / maxWeight); // 根据 PageRank 权重调整节点大小
+        });
+
+        // 初始化图表
+        var myChart = echarts.init(document.getElementById('main'));
+
+        var option = {
+            tooltip: {
+                trigger: 'item',
+                formatter: function(params) {
+                    if (params.dataType === 'node') {
+                        return 'Node: ' + params.data.name + '<br/>Camp: ' + params.data.camp + '<br/>Weight: ' + params.data.weight.toFixed(2);
+                    } else if (params.dataType === 'edge') {
+                        return 'Relationship: ' + params.data.value;
+                    }
+                }
+            },
+            animation: true,
+            series: [{
+                type: 'graph',
+                layout: 'force',
+                data: nodes,
+                links: links,
+                roam: true,
+                force: {
+                    repulsion: 1000, // 节点之间的斥力，数值越大斥力越大
+                    edgeLength: [50, 150], // 边的长度范围
+                    layoutAnimation: true // 启用布局动画，当节点移动时显示动画
+                },
+                lineStyle: {
+                    width: 2,
+                    color: 'source'
+                },
+                label: {
+                    show: true,
+                    position: 'right', // 边的标签位置
+                    fontSize: 12
+                }
+            }]
+        };
+
+        myChart.setOption(option);
+
+        // 点击节点时展示侧边栏
+      myChart.on('click', function(params) {
+        if (params.dataType === 'node') {
+            var personName = params.data.name;
+            var personImage = '/static/images/' + personName + '.jpg';
+            var personIntroFile = '/static/introduce/' + personName + '.txt';
+
+            // 尝试加载图片
+            var img = new Image();
+            img.onload = function() {
+                // 图片加载成功时，设置图片路径并显示
+                document.getElementById('person-image').style.display = 'block';
+                document.getElementById('person-image').src = personImage;
+            };
+            img.onerror = function() {
+                // 图片加载失败时，不显示图片
+                document.getElementById('person-image').style.display = 'none';
+            };
+            img.src = personImage; // 触发图片加载
+
+            // 获取介绍文本文件
+            fetch(personIntroFile)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('介绍文件加载失败');
+                    }
+                    return response.text();
+                })
+                .then(text => {
+                    // 更新侧边栏内容为图片和介绍
+                    document.getElementById('person-name').innerText = personName;
+                    document.getElementById('person-intro').innerText = text || '暂无介绍'; // 如果没有介绍，显示“暂无介绍”
+
+                    // 显示侧边栏和遮层
+                    document.getElementById('sidebar').style.right = '0'; // 侧边栏滑入
+                    document.getElementById('overlay').style.display = 'block'; // 显示遮罩层
+                })
+                .catch(err => {
+                    console.error('获取介绍时出错:', err);
+                    // 如果获取介绍出错，显示“暂无介绍”
+                    document.getElementById('person-name').innerText = personName;
+                    document.getElementById('person-intro').innerText = '暂无介绍';
+
+                    // 显示侧边栏和遮罩层
+                    document.getElementById('sidebar').style.right = '0'; // 侧边栏滑入
+                    document.getElementById('overlay').style.display = 'block'; // 显示遮罩层
+                });
+        }
+    });
+
+
+
+        // 关闭侧边栏
+        document.getElementById('overlay').addEventListener('click', function() {
+            document.getElementById('sidebar').style.right = '-300px'; // 侧边栏滑出
+            document.getElementById('overlay').style.display = 'none'; // 隐藏遮罩层
+        });
+
+
+        // 阵营筛选功能
+        document.getElementById('camp-select').addEventListener('change', function(event) {
+            var selectedCamp = event.target.value;
+
+            // 根据选择的阵营筛选节点
+            var filteredNodes = nodes.filter(function(node) {
+                if (selectedCamp === 'all') {
+                    return true; // 显示所有节点
+                }
+                return node.camp === selectedCamp; // 只显示属于选定阵营的节点
+            });
+
+            // 更新图表选项为筛选后的节点
+            myChart.setOption({
+                series: [{
+                    data: filteredNodes
+                }]
+            });
+        });
+
+         document.getElementById('search-input').addEventListener('input', function(event) {
+        var searchName = event.target.value.toLowerCase();
+        filterGraphByName(searchName);
+    });
+
+    // 筛选函数
+    function filterGraphByName(searchName) {
+        if (!searchName) {
+            // 如果搜索框为空，显示所有节点和边
+            myChart.setOption({
+                series: [{
+                    data: nodes,
+                    links: links
+                }]
+            });
+            return;
+        }
+
+        // 找到匹配的节点
+        var targetNodes = nodes.filter(node => node.name.toLowerCase().includes(searchName));
+        if (targetNodes.length === 0) {
+            // 没有匹配的节点，显示空图
+            myChart.setOption({
+                series: [{
+                    data: [],
+                    links: []
+                }]
+            });
+            return;
+        }
+
+        // 获取匹配节点的名称
+        var targetNodeNames = new Set(targetNodes.map(node => node.name));
+
+        // 找到与匹配节点相连的所有边
+        var relatedEdges = links.filter(link =>
+            targetNodeNames.has(link.source) || targetNodeNames.has(link.target)
+        );
+
+        // 找到相关边连接的其他节点
+        var relatedNodeNames = new Set();
+        relatedEdges.forEach(link => {
+            relatedNodeNames.add(link.source);
+            relatedNodeNames.add(link.target);
+        });
+
+        // 找到这些节点对应的对象
+        var relatedNodes = nodes.filter(node => relatedNodeNames.has(node.name));
+
+        // 合并匹配节点和相关节点
+        var finalNodes = [...targetNodes, ...relatedNodes.filter(node => !targetNodeNames.has(node.name))];
+
+        // 更新图表数据
+        myChart.setOption({
+            series: [{
+                data: finalNodes,
+                links: relatedEdges
+            }]
+        });
+    }
+
+
+    </script>
+    <script src="../../static/js/jquery-3.7.1.min.js"></script>
+    <script src="../../static/js/jq.js"></script>
+</body>
+</html>
